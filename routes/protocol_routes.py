@@ -2,6 +2,7 @@
 协议相关路由
 """
 from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
 from services.protocol_service import (
     get_protocol_list,
     get_protocol,
@@ -10,11 +11,18 @@ from services.protocol_service import (
     delete_protocol
 )
 from services.preview_service import create_preview, get_preview_content
+from utils.auth import require_login, require_role
+from db.models import OperationLog
+
+def get_db():
+    from db.database import db
+    return db
 
 protocol_bp = Blueprint('protocol', __name__, url_prefix='/api/protocols')
 
 
 @protocol_bp.route('', methods=['GET'])
+@require_login
 def list_protocols():
     """获取协议列表"""
     try:
@@ -25,6 +33,7 @@ def list_protocols():
 
 
 @protocol_bp.route('/<path:filename>', methods=['GET'])
+@require_login
 def retrieve_protocol(filename):
     """获取协议内容"""
     try:
@@ -37,60 +46,109 @@ def retrieve_protocol(filename):
 
 
 @protocol_bp.route('', methods=['POST'])
+@require_role('admin', 'editor')
 def create():
     """创建新协议"""
     try:
         data = request.json
         filename = data.get('filename')
         content = data.get('content')
-        
+
         created_filename = create_protocol(filename, content)
+
+        # 记录操作日志
+        log = OperationLog(
+            user_id=current_user.id,
+            action='create_protocol',
+            resource_type='protocol',
+            resource_name=created_filename,
+            details=f'创建了协议文件: {created_filename}'
+        )
+        db = get_db()
+        db.session.add(log)
+        db.session.commit()
+
         return jsonify({'message': '创建成功', 'filename': created_filename}), 201
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except FileExistsError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db = get_db()
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
 @protocol_bp.route('/<path:filename>', methods=['PUT'])
+@require_role('admin', 'editor')
 def update(filename):
     """更新协议"""
     try:
         data = request.json
         content = data.get('content')
-        
+
         update_protocol(filename, content)
+
+        # 记录操作日志
+        log = OperationLog(
+            user_id=current_user.id,
+            action='update_protocol',
+            resource_type='protocol',
+            resource_name=filename,
+            details=f'更新了协议文件: {filename}'
+        )
+        db = get_db()
+        db.session.add(log)
+        db.session.commit()
+
         return jsonify({'message': '更新成功'}), 200
     except FileNotFoundError as e:
         return jsonify({'error': str(e)}), 404
     except Exception as e:
+        db = get_db()
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
 @protocol_bp.route('/<path:filename>', methods=['DELETE'])
+@require_role('admin', 'editor')
 def delete(filename):
     """删除协议"""
     try:
         delete_protocol(filename)
+
+        # 记录操作日志
+        log = OperationLog(
+            user_id=current_user.id,
+            action='delete_protocol',
+            resource_type='protocol',
+            resource_name=filename,
+            details=f'删除了协议文件: {filename}'
+        )
+        db = get_db()
+        db.session.add(log)
+        db.session.commit()
+
         return jsonify({'message': '删除成功'}), 200
     except FileNotFoundError as e:
         return jsonify({'error': str(e)}), 404
     except Exception as e:
+        db = get_db()
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
 @protocol_bp.route('/preview', methods=['POST'])
+@require_login
 def create_preview_route():
     """创建预览，返回预览 ID"""
     try:
         data = request.json
         html_content = data.get('content', '')
-        
+
         if not html_content:
             return jsonify({'error': 'HTML 内容不能为空'}), 400
-        
+
         preview_id = create_preview(html_content)
         # 返回预览 URL（前端可以通过这个 URL 访问预览内容）
         preview_url = f'/api/protocols/preview/{preview_id}'
@@ -113,4 +171,3 @@ def get_preview_route(preview_id):
         return jsonify({'error': str(e)}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
