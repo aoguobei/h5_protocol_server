@@ -8,9 +8,10 @@ from services.protocol_service import (
     get_protocol,
     create_protocol,
     update_protocol,
-    delete_protocol
+    delete_protocol,
+    create_preview,
+    get_preview_content
 )
-from services.preview_service import create_preview, get_preview_content
 from utils.auth import require_login, require_role
 from db.models import OperationLog
 

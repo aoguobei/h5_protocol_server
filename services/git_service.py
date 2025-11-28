@@ -291,17 +291,13 @@ def deploy(commit_message):
     output = _get_command_output(result)
     steps.append({'step': 'git commit', 'status': 'success', 'output': output or '执行成功'})
 
-    # 3. git push origin master (已注释，用于测试)
-    # result = subprocess.run(
-    #     ['git', 'push', 'origin', 'master'],
-    #     cwd=str(frontend_path),
-    #     capture_output=True,
-    #     text=True,
-    #     encoding='utf-8'
-    # )
-    # if result.returncode != 0:
-    #     raise RuntimeError(f'git push origin master 失败: {result.stderr}')
-    steps.append({'step': 'git push origin master', 'status': 'skipped', 'output': '已跳过（测试模式）'})
+    # 3. git push origin master
+    result = _run_git_command(['git', 'push', 'origin', 'master'], cwd=frontend_path)
+    if result.returncode != 0:
+        error_msg = _format_error(result)
+        raise RuntimeError(f'git push origin master 失败: {error_msg}')
+    output = _get_command_output(result)
+    steps.append({'step': 'git push origin master', 'status': 'success', 'output': output or '推送成功'})
 
     # 4. npm run build
     # 设置 NODE_OPTIONS 环境变量以解决 Node.js 17+ 的 OpenSSL 兼容性问题
@@ -369,17 +365,13 @@ def deploy(commit_message):
         output = result.stderr or result.stdout or '无变更，跳过提交'
         steps.append({'step': 'git commit (alpha)', 'status': 'warning', 'output': output})
 
-    # 11. git push origin alpha (已注释，用于测试)
-    # result = subprocess.run(
-    #     ['git', 'push', 'origin', 'alpha'],
-    #     cwd=str(frontend_path),
-    #     capture_output=True,
-    #     text=True,
-    #     encoding='utf-8'
-    # )
-    # if result.returncode != 0:
-    #     raise RuntimeError(f'git push origin alpha 失败: {result.stderr}')
-    steps.append({'step': 'git push origin alpha', 'status': 'skipped', 'output': '已跳过（测试模式）'})
+    # 11. git push origin alpha
+    result = _run_git_command(['git', 'push', 'origin', 'alpha'], cwd=frontend_path)
+    if result.returncode != 0:
+        error_msg = _format_error(result)
+        raise RuntimeError(f'git push origin alpha 失败: {error_msg}')
+    output = _get_command_output(result)
+    steps.append({'step': 'git push origin alpha', 'status': 'success', 'output': output or '推送成功'})
 
     # 12. 切换回 master 分支
     result = _run_git_command(['git', 'checkout', 'master'], cwd=frontend_path)

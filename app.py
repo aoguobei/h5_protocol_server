@@ -20,7 +20,7 @@ def create_app():
     login_manager.login_view = 'auth.login' # 指定「登录页面的路由端点（endpoint）」
     login_manager.login_message = '请先登录以访问此页面。' # 设置「未登录用户被重定向时，显示的提示消息」
 
-    CORS(app)
+    CORS(app, supports_credentials=True)
 
     # 导入并注册蓝图
     from routes.auth_routes import auth_bp
@@ -48,4 +48,4 @@ def load_user(user_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

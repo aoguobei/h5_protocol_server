@@ -3,9 +3,16 @@
 """
 import os
 import re
+import uuid
+import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import FRONTEND_DIR
+
+# 内存存储预览内容
+_preview_storage = {}
+_CLEANUP_INTERVAL = 300
+_last_cleanup = time.time()
 
 
 def _get_protocol_dir():
@@ -146,3 +153,52 @@ def delete_protocol(filename):
         raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
 
     file_path.unlink()  # 删除文件
+
+
+def _cleanup_expired_previews():
+    """清理过期的预览内容"""
+    global _last_cleanup
+    current_time = time.time()
+    
+    if current_time - _last_cleanup < _CLEANUP_INTERVAL:
+        return
+    
+    _last_cleanup = current_time
+    now = datetime.now()
+    expired_ids = [
+        preview_id for preview_id, data in _preview_storage.items()
+        if data['expires_at'] < now
+    ]
+    for preview_id in expired_ids:
+        del _preview_storage[preview_id]
+
+
+def create_preview(html_content):
+    """创建预览，返回预览 ID"""
+    if not html_content:
+        raise ValueError('HTML 内容不能为空')
+    
+    _cleanup_expired_previews()
+    preview_id = str(uuid.uuid4())
+    expires_at = datetime.now() + timedelta(hours=1)
+    
+    _preview_storage[preview_id] = {
+        'content': html_content,
+        'expires_at': expires_at
+    }
+    
+    return preview_id
+
+
+def get_preview_content(preview_id):
+    """获取预览内容"""
+    if preview_id not in _preview_storage:
+        raise ValueError('预览不存在或已过期')
+    
+    data = _preview_storage[preview_id]
+    
+    if data['expires_at'] < datetime.now():
+        del _preview_storage[preview_id]
+        raise ValueError('预览已过期')
+    
+    return data['content']
