@@ -18,6 +18,9 @@ def authenticate_user(username, password):
     if user is None:
         # 用户不存在
         return {'user': None, 'error': '用户不存在'}
+    elif not user.is_active:
+        # 用户已被禁用
+        return {'user': None, 'error': '账号已被禁用，请联系管理员'}
     elif not user.check_password(password):
         # 密码错误
         return {'user': None, 'error': '密码错误'}

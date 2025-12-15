@@ -30,11 +30,12 @@ def update_user_role(user_id, new_role):
     db.session.commit()
 
 
-def delete_user(user_id):
-    """删除用户"""
+def toggle_user_status(user_id):
+    """切换用户状态（启用/禁用）"""
     user = User.query.get_or_404(user_id)
-    db.session.delete(user)
+    user.is_active = not user.is_active
     db.session.commit()
+    return user.is_active
 
 
 def create_user(username, password, role='viewer'):

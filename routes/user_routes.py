@@ -3,7 +3,7 @@
 """
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from services.user_service import get_user_list, update_user_role, delete_user, create_user
+from services.user_service import get_user_list, update_user_role, toggle_user_status, create_user
 from utils.auth import require_role
 
 def get_db():
@@ -75,30 +75,37 @@ def update_user_role_api(user_id):
         return jsonify({'error': str(e)}), 500
 
 
-@user_bp.route('/<int:user_id>', methods=['DELETE'])
+@user_bp.route('/<int:user_id>/toggle', methods=['PUT'])
 @login_required
 @require_role('admin')
-def delete_user_api(user_id):
-    """删除用户"""
+def toggle_user_status_api(user_id):
+    """禁用/启用用户"""
     try:
         if current_user.id == user_id:
-            return jsonify({'error': '不能删除自己'}), 400
+            return jsonify({'error': '不能禁用自己'}), 400
 
-        delete_user(user_id)
+        # 先获取用户信息
+        from db.models import User
+        target_user = User.query.get_or_404(user_id)
+        username = target_user.username
+
+        # 切换用户状态
+        is_active = toggle_user_status(user_id)
 
         # 记录操作日志
         from services.user_service import log_user_action
-        # 获取用户名
-        from db.models import User
-        target_user = User.query.get_or_404(user_id)
+        action_text = '启用' if is_active else '禁用'
         log_user_action(
-            action='delete_user',
+            action='toggle_user_status',
             resource_type='user',
-            resource_name=f'user_{target_user.username}',
-            details=f'删除了用户 {target_user.username}'
+            resource_name=f'user_{username}',
+            details=f'{action_text}了用户 {username}'
         )
 
-        return jsonify({'message': '用户删除成功'}), 200
+        return jsonify({
+            'message': f'用户{action_text}成功',
+            'is_active': is_active
+        }), 200
     except Exception as e:
         db = get_db()
         db.session.rollback()

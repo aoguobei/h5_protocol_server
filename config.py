@@ -27,3 +27,6 @@ class Config:
 
     # 前端目录配置
     FRONTEND_DIR = FRONTEND_DIR
+    
+    # JSON配置：不转义中文
+    JSON_AS_ASCII = False

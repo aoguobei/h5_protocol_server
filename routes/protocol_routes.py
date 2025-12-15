@@ -28,7 +28,12 @@ def list_protocols():
     """获取协议列表"""
     try:
         files = get_protocol_list()
-        return jsonify(files), 200
+        from flask import current_app
+        return current_app.response_class(
+            response=current_app.json.dumps(files, ensure_ascii=False),
+            status=200,
+            mimetype='application/json; charset=utf-8'
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -54,10 +59,12 @@ def create():
         data = request.json
         filename = data.get('filename')
         content = data.get('content')
+        description = data.get('description')
+        app_type = data.get('app_type')
+        app_name = data.get('app_name')
 
-        created_filename = create_protocol(filename, content)
+        created_filename = create_protocol(filename, content, description, app_type, app_name)
 
-        # 记录操作日志
         log = OperationLog(
             user_id=current_user.id,
             action='create_protocol',
@@ -87,10 +94,12 @@ def update(filename):
     try:
         data = request.json
         content = data.get('content')
+        description = data.get('description')
+        app_type = data.get('app_type')
+        app_name = data.get('app_name')
 
-        update_protocol(filename, content)
+        update_protocol(filename, content, description, app_type, app_name)
 
-        # 记录操作日志
         log = OperationLog(
             user_id=current_user.id,
             action='update_protocol',

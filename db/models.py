@@ -17,6 +17,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='viewer')  # 'admin', 'editor', 'viewer'
+    is_active = db.Column(db.Boolean, nullable=False, default=True)  # 用户是否启用
     updated_at = db.Column(db.DateTime, default=datetime.utcnow,
                           onupdate=datetime.utcnow)
 
@@ -34,7 +35,29 @@ class User(UserMixin, db.Model):
             'id': self.id,
             'username': self.username,
             'role': self.role,
+            'is_active': self.is_active,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class Protocol(db.Model):
+    """协议文件模型"""
+    __tablename__ = 'protocols'
+
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), unique=True, nullable=False)  # 协议文件名（唯一）
+    description = db.Column(db.Text)  # 文件描述
+    app_type = db.Column(db.String(100))  # 应用类型：影视小程序、漫剧小程序、短剧小程序、车机、H5小说
+    app_name = db.Column(db.String(100))  # 影视名称：风行视频小程序、车机等
+
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'filename': self.filename,
+            'description': self.description,
+            'app_type': self.app_type,
+            'app_name': self.app_name
         }
 
 

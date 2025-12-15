@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from config import FRONTEND_DIR
+from db.database import db
+from db.models import Protocol
 
 # 内存存储预览内容
 _preview_storage = {}
@@ -64,95 +66,126 @@ def get_protocol_list():
     """获取协议文件列表"""
     protocol_dir = _get_protocol_dir()
     files = []
-
+    
+    # 获取所有数据库中的协议记录，建立文件名到协议对象的映射
+    all_protocols = Protocol.query.all()
+    print(f"数据库中查询到 {len(all_protocols)} 条协议记录")
+    db_protocols = {p.filename: p for p in all_protocols}
+    
     for file_path in protocol_dir.glob('*.html'):
         try:
             stat = file_path.stat()
-            # 尝试从HTML文件中提取标题，如果失败则使用文件名作为标题
-            title = extract_title_from_html(file_path)
-            # 将时间戳转换为格式化的日期时间字符串，便于前端显示
-            formatted_time = datetime.fromtimestamp(stat.st_mtime if stat else 0).strftime('%Y-%m-%d %H:%M:%S')
+            filename = file_path.name
+            # title = extract_title_from_html(file_path)
+            formatted_time = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 从数据库获取协议属性
+            protocol = db_protocols.get(filename)
+            
             files.append({
-                'filename': file_path.name or '',
-                'size': int(stat.st_size) if stat else 0,
-                'updateTime': formatted_time, # 使用格式化的日期时间字符串
-                'title': title  # 直接使用提取的标题，如果提取失败则为已返回的空字符串
+                'id': protocol.id if protocol else None,
+                'filename': filename,
+                'size': int(stat.st_size),
+                'updateTime': formatted_time,
+                # 'title': title,
+                'description': protocol.description if protocol else None,
+                'app_type': protocol.app_type if protocol else None,
+                'app_name': protocol.app_name if protocol else None
             })
         except Exception as e:
-            # 如果处理单个文件失败，跳过该文件并记录错误
             print(f"处理协议文件时出错 {file_path}: {str(e)}")
             continue
-
-    # 确保所有条目都包含必需字段并具有有效值
-    valid_files = [ensure_valid_protocol_entry(entry) for entry in files]
-    # 按修改时间排序，最新的在前 (时间字符串格式为 'YYYY-MM-DD HH:MM:SS', 可以直接比较)
-    valid_files.sort(key=lambda x: x['updateTime'], reverse=True)
-    return valid_files
+    
+    # 按修改时间排序
+    files.sort(key=lambda x: x['updateTime'], reverse=True)
+    return files
 
 
 def get_protocol(filename):
     """获取协议内容"""
-    # 防止路径遍历攻击
     safe_filename = os.path.basename(filename)
+    protocol = Protocol.query.filter_by(filename=safe_filename).first()
+    if not protocol:
+        raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
+    
     file_path = _get_protocol_dir() / safe_filename
-
     if not file_path.exists():
         raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
-
+    
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
+    
+    result = protocol.to_dict()
+    result['content'] = content
+    return result
 
-    return {
-        'filename': safe_filename,
-        'content': content
-    }
 
-
-def create_protocol(filename, content):
+def create_protocol(filename, content, description=None, app_type=None, app_name=None):
     """创建协议文件"""
-    # 验证文件名
     if not filename.endswith('.html'):
         filename += '.html'
-
-    # 防止路径遍历攻击
+    
     safe_filename = os.path.basename(filename)
+    
+    if Protocol.query.filter_by(filename=safe_filename).first():
+        raise FileExistsError(f'协议文件已存在: {safe_filename}')
+    
     file_path = _get_protocol_dir() / safe_filename
-
-    # 检查文件是否已存在
     if file_path.exists():
         raise FileExistsError(f'协议文件已存在: {safe_filename}')
-
-    # 写入文件
+    
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
-
+    
+    protocol = Protocol(
+        filename=safe_filename,
+        description=description,
+        app_type=app_type,
+        app_name=app_name
+    )
+    db.session.add(protocol)
+    db.session.commit()
+    
     return safe_filename
 
 
-def update_protocol(filename, content):
+def update_protocol(filename, content=None, description=None, app_type=None, app_name=None):
     """更新协议文件"""
-    # 防止路径遍历攻击
     safe_filename = os.path.basename(filename)
-    file_path = _get_protocol_dir() / safe_filename
-
-    if not file_path.exists():
+    protocol = Protocol.query.filter_by(filename=safe_filename).first()
+    if not protocol:
         raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
-
-    # 写入文件
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(content)
+    
+    if content is not None:
+        file_path = _get_protocol_dir() / safe_filename
+        if not file_path.exists():
+            raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+    
+    if description is not None:
+        protocol.description = description
+    if app_type is not None:
+        protocol.app_type = app_type
+    if app_name is not None:
+        protocol.app_name = app_name
+    
+    db.session.commit()
 
 
 def delete_protocol(filename):
     """删除协议文件"""
-    # 防止路径遍历攻击
     safe_filename = os.path.basename(filename)
-    file_path = _get_protocol_dir() / safe_filename
-
-    if not file_path.exists():
+    protocol = Protocol.query.filter_by(filename=safe_filename).first()
+    if not protocol:
         raise FileNotFoundError(f'协议文件不存在: {safe_filename}')
-
-    file_path.unlink()  # 删除文件
+    
+    file_path = _get_protocol_dir() / safe_filename
+    if file_path.exists():
+        file_path.unlink()
+    
+    db.session.delete(protocol)
+    db.session.commit()
 
 
 def _cleanup_expired_previews():
