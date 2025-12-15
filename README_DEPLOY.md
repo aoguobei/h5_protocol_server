@@ -22,7 +22,7 @@ nano .env  # 修改 SECRET_KEY 和 FRONTEND_DIR
 
 ### 4. 初始化数据库
 ```bash
-python3 init_db.py
+mysql -u root -p < db/init.sql
 ```
 
 ### 5. 启动服务

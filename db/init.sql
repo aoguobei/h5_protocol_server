@@ -43,9 +43,9 @@ CREATE TABLE IF NOT EXISTS operation_logs (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 插入默认管理员账户 (密码: admin123)
-INSERT INTO users (username, password_hash, role)
-VALUES ('admin', 'scrypt:32768:8:1$XetPWKdj60InKrbU$6c216ca842cfd8124bfac0ff5e90cfaab01040acc0f19c373b482069c840e5225d750f538c33de3ee46f4d874b44404164fca867e13b85057fd110d03f5cb430', 'admin')
+-- 插入默认管理员账户 (用户名: admin@fun.tv, 密码: ******)
+INSERT INTO users (username, password_hash, role, is_active)
+VALUES ('admin@fun.tv', 'scrypt:32768:8:1$6iUrzTnMUgSM1W89$60be143ffa7402e9f392a39e9c0ca0a69fd2be8cb5c38b8895ace678d5001eff92b5083594740246b46b1c8616b72df65e38c551a6465d13cf2066a829e5cc04', 'admin', TRUE)
 ON DUPLICATE KEY UPDATE username=username;
 
 -- 协议文件数据插入SQL
